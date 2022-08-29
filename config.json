@@ -1,0 +1,22 @@
+{
+  "token": "",
+  "guild": "",
+  "serverName": "",
+
+  "clanCategory": "",
+
+  "leaderRole": "",
+  "coLeaderRole": "",
+
+  "mongo_legacy": true,
+  "mongo_host": "mongodb uri if you use legacy, if not just put the ip",
+  "mongo_port": 27017,
+  "mongo_database": "database name you want to store it as",
+  "mongo_auth": false,
+  "mongo_username": "Username",
+  "mongo_password": "Password",
+
+  "status": "",
+
+  "prefix": "-"
+}
