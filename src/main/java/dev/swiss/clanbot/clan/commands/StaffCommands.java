@@ -1,5 +1,6 @@
 package dev.swiss.clanbot.clan.commands;
 
+import dev.swiss.clanbot.ClanBot;
 import dev.swiss.clanbot.clan.*;
 import net.dv8tion.jda.api.*;
 import net.dv8tion.jda.api.entities.*;
@@ -31,17 +32,19 @@ public class StaffCommands extends ListenerAdapter {
                 Clan clan = Clan.getByName(name);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("`" + name + "` doesn't exist")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("`" + name + "` doesn't exist")
+                            .build()
                     ).queue();
                     return;
                 }
 
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("`" + clan.getName() + "` is now deleted")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("`" + clan.getName() + "` is now deleted")
+                        .build()
                 ).queue();
                 clan.disband();
             }

@@ -19,6 +19,8 @@ public class ButtonClickListener extends ListenerAdapter {
 
     @Override
     public void onButtonClick(@NotNull ButtonClickEvent event) {
+        if(!event.getChannelType().equals(ChannelType.PRIVATE)) return;
+
         PrivateChannel pc = event.getPrivateChannel();
 
         Clan clan = Clan.getClanByInviteMessage(event.getMessageIdLong());
@@ -29,6 +31,7 @@ public class ButtonClickListener extends ListenerAdapter {
         if(invite.getExpiredTime() <= System.currentTimeMillis()) {
             pc.sendMessageEmbeds(
                     new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
                             .setDescription("That invite expired, ask the leader for a new one")
                             .build()
             ).queue();
@@ -37,6 +40,7 @@ public class ButtonClickListener extends ListenerAdapter {
         }
 
         Member leader = ClanBot.getInstance().getGuild().retrieveMemberById(clan.getLeader()).complete();
+        if(leader == null) return;
 
         if(event.getComponentId().equals("join")) {
             event.replyEmbeds(
@@ -47,6 +51,7 @@ public class ButtonClickListener extends ListenerAdapter {
             ).queue();
             leader.getUser().openPrivateChannel().queue((channel -> channel.sendMessageEmbeds(
                     new EmbedBuilder()
+                            .setColor(Color.decode(clan.getColor()))
                             .setDescription(invite.getMember().getAsMention() + " has joined `" + clan.getName() + "`")
                             .build()
             ).queue()));
@@ -63,6 +68,7 @@ public class ButtonClickListener extends ListenerAdapter {
             ).queue();
             leader.getUser().openPrivateChannel().queue((channel -> channel.sendMessageEmbeds(
                     new EmbedBuilder()
+                            .setColor(Color.decode(clan.getColor()))
                             .setDescription(invite.getMember().getAsMention() + " has declined your invite to `" + clan.getName() + "`")
                             .build()
             ).queue()));

@@ -14,6 +14,10 @@ public class Config {
 
   private long clanCategory;
 
+  private long adminLogChannel;
+
+  private String embedColor;
+
   private long leaderRole;
   private long coLeaderRole;
 

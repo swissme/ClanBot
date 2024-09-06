@@ -1,13 +1,18 @@
 package dev.swiss.clanbot.clan.commands;
 
+import com.mongodb.client.model.Filters;
 import dev.swiss.clanbot.*;
 import dev.swiss.clanbot.clan.*;
+import dev.swiss.clanbot.clan.Invite;
+import dev.swiss.clanbot.mongodb.MongoHandler;
 import net.dv8tion.jda.api.*;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.interaction.*;
 import net.dv8tion.jda.api.exceptions.*;
 import net.dv8tion.jda.api.hooks.*;
+import net.dv8tion.jda.api.interactions.components.Button;
 import net.dv8tion.jda.api.requests.*;
+import org.bson.Document;
 import org.jetbrains.annotations.*;
 
 import java.awt.*;
@@ -33,7 +38,8 @@ public class ClanCommands extends ListenerAdapter {
                 String name = Objects.requireNonNull(event.getOption("name")).getAsString();
                 if(Clan.exists(name)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
                             .setDescription("That clan already exists")
                             .build()
                     ).queue();
@@ -41,22 +47,71 @@ public class ClanCommands extends ListenerAdapter {
                 }
                 if(Clan.inClan(member)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
                             .setDescription("You already in a clan")
                             .build()
                     ).queue();
                     return;
                 }
-                new Clan(name, member.getIdLong());
-                event.replyEmbeds(
+                if(ClanRequest.getClanRequests().containsKey(member.getIdLong())) {
+                    event.replyEmbeds(
                         new EmbedBuilder()
-                        .setDescription("Successfully created the clan named `" + name + "`")
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You already have a clan request")
+                            .build()
+                    ).queue();
+                    return;
+                }
+                for (Long leaderLoop : ClanRequest.getClanRequests().keySet()) {
+                    ClanRequest clanRequest = ClanRequest.getClanRequests().get(leaderLoop);
+                    if(clanRequest == null) continue;
+                    if(clanRequest.getName().equalsIgnoreCase(name)) {
+                        event.replyEmbeds(
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("A clan request with that name already exists")
+                                .build()
+                        ).queue();
+                        return;
+                    }
+                }
+
+                ClanRequest clanRequest = new ClanRequest(member.getIdLong(), name);
+
+                TextChannel adminLogChannel = ClanBot.getInstance().getAdminLogChannel();
+
+                if (adminLogChannel != null) {
+                    List<Button> buttons = new ArrayList<>();
+                    buttons.add(Button.success("accept", "Accept"));
+                    buttons.add(Button.danger("deny", "Deny"));
+                    adminLogChannel.sendMessageEmbeds(
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setTitle("New Clan Creation Request")
+                            .setDescription("**Clan Name:**\n> " + clanRequest.getName() + "\n**Clan Leader:**\n> " + member.getAsMention() + " / (" + member.getUser().getAsTag() + ")")
+                            .build()
+                    ).setActionRow(buttons).queue(message -> {
+                        MongoHandler.getClanRequests().insertOne(new Document()
+                            .append("messageID", message.getIdLong())
+                            .append("name", clanRequest.getName())
+                            .append("nameLowerCase", clanRequest.getName().toLowerCase())
+                            .append("leader", clanRequest.getLeader()));
+                        clanRequest.setMessageID(message.getIdLong());
+                    });
+                }
+
+                event.replyEmbeds(
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully requested to create the clan named `" + name + "`")
                         .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("disband")) {
                 if(!Clan.inClan(member)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
                             .setDescription("You are not in a clan")
                             .build()
                     ).queue();
@@ -66,9 +121,10 @@ public class ClanCommands extends ListenerAdapter {
                 assert clan != null;
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -77,18 +133,20 @@ public class ClanCommands extends ListenerAdapter {
 
                     try {
                         pc.sendMessageEmbeds(
-                                new EmbedBuilder()
-                                        .setDescription("Your clan `" + clan.getName() + "` has been disbanded")
-                                        .build()
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("Your clan `" + clan.getName() + "` has been disbanded")
+                                .build()
                         ).queue();
                     } catch(ErrorResponseException ignored) {
 
                     }
                 }
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully disbanded your clan named `" + clan.getName() + "`")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully disbanded your clan named `" + clan.getName() + "`")
+                        .build()
                 ).queue();
                 clan.disband();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("info")) {
@@ -97,9 +155,10 @@ public class ClanCommands extends ListenerAdapter {
                     clan = Clan.getByMember(member);
                     if(clan == null) {
                         event.replyEmbeds(
-                                new EmbedBuilder()
-                                        .setDescription("You are not in a clan")
-                                        .build()
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("You are not in a clan")
+                                .build()
                         ).queue();
                         return;
                     }
@@ -109,9 +168,10 @@ public class ClanCommands extends ListenerAdapter {
                     clan = Clan.getByName(name);
                     if(clan == null) {
                         event.replyEmbeds(
-                                new EmbedBuilder()
-                                        .setDescription("That clan doesn't exist")
-                                        .build()
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("That clan doesn't exist")
+                                .build()
                         ).queue();
                         return;
                     }
@@ -154,17 +214,19 @@ public class ClanCommands extends ListenerAdapter {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -172,17 +234,19 @@ public class ClanCommands extends ListenerAdapter {
                 Member newLeader = ClanBot.getInstance().getGuild().retrieveMemberById(mentioned.getIdLong()).complete();
                 if(newLeader.getIdLong() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You cannot set the leader to yourself")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You cannot set the leader to yourself")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(!clan.getMembers().contains(newLeader.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(newLeader.getAsMention() + " is not in your clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(newLeader.getAsMention() + " is not in your clan")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -192,25 +256,28 @@ public class ClanCommands extends ListenerAdapter {
                 clan.setLeader(newLeader.getIdLong());
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("You have set the leader position to " + newLeader.getAsMention())
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("You have set the leader position to " + newLeader.getAsMention())
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("promote")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -218,25 +285,28 @@ public class ClanCommands extends ListenerAdapter {
                 Member target = ClanBot.getInstance().getGuild().retrieveMemberById(mentioned.getIdLong()).complete();
                 if(target.getIdLong() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You cannot promote yourself")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You cannot promote yourself")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(!clan.getMembers().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is not in your clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is not in your clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getColeaders().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is already a coleader")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is already a coleader")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -244,25 +314,28 @@ public class ClanCommands extends ListenerAdapter {
                 clan.getColeaders().add(target.getIdLong());
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription(target.getAsMention() + " is now promoted to coleader")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription(target.getAsMention() + " is now promoted to coleader")
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("demote")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -270,25 +343,28 @@ public class ClanCommands extends ListenerAdapter {
                 Member target = ClanBot.getInstance().getGuild().retrieveMemberById(mentioned.getIdLong()).complete();
                 if(target.getIdLong() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You cannot demote yourself")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You cannot demote yourself")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(!clan.getMembers().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is not in your clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is not in your clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(!clan.getColeaders().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " isn't a coleader")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " isn't a coleader")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -296,17 +372,19 @@ public class ClanCommands extends ListenerAdapter {
                 clan.getColeaders().remove(target.getIdLong());
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription(target.getAsMention() + " is demoted from coleader")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription(target.getAsMention() + " is demoted from coleader")
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("invite")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -314,33 +392,37 @@ public class ClanCommands extends ListenerAdapter {
                 Member target = ClanBot.getInstance().getGuild().retrieveMemberById(mentioned.getIdLong()).complete();
                 if(target.getIdLong() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You cannot invite yourself")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You cannot invite yourself")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getMembers().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is already in your clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is already in your clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(Clan.getByMember(target) != null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("That user is already in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("That user is already in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getInvites().stream().anyMatch(invite -> invite.getMember().getIdLong() == target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is already invited to `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is already invited to `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -357,9 +439,10 @@ public class ClanCommands extends ListenerAdapter {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -367,34 +450,38 @@ public class ClanCommands extends ListenerAdapter {
                 Member target = ClanBot.getInstance().getGuild().retrieveMemberById(mentioned.getIdLong()).complete();
                 if(target.getIdLong() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You cannot kick yourself")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You cannot kick yourself")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(!clan.getMembers().contains(target.getIdLong())) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription(target.getAsMention() + " is not in your clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription(target.getAsMention() + " is not in your clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getColeaders().contains(member.getIdLong())) {
                     if(clan.getColeaders().contains(target.getIdLong())) {
                         event.replyEmbeds(
-                                new EmbedBuilder()
-                                        .setDescription("You cannot kick another coleader")
-                                        .build()
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("You cannot kick another coleader")
+                                .build()
                         ).queue();
                         return;
                     }
                     if(clan.getLeader() == target.getIdLong()) {
                         event.replyEmbeds(
-                                new EmbedBuilder()
-                                        .setDescription("You cannot kick a leader")
-                                        .build()
+                            new EmbedBuilder()
+                                .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                                .setDescription("You cannot kick a leader")
+                                .build()
                         ).queue();
                         return;
                     }
@@ -407,9 +494,10 @@ public class ClanCommands extends ListenerAdapter {
                     clan.getMembers().remove(target.getIdLong());
                     clan.save();
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You have kicked " + target.getAsMention() + " from `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You have kicked " + target.getAsMention() + " from `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -418,129 +506,144 @@ public class ClanCommands extends ListenerAdapter {
                     clan.getMembers().remove(target.getIdLong());
                     clan.save();
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You have kicked " + target.getAsMention() + " from `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You have kicked " + target.getAsMention() + " from `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                 }
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("setlogo")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
                 String logo = Objects.requireNonNull(event.getOption("logo")).getAsString();
                 if(!ClanBot.isValid(logo)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("Please use a valid image url")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("Please use a valid image url")
+                            .build()
                     ).queue();
                     return;
                 }
                 clan.setLogo(logo);
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully set the logo")
-                                .setThumbnail(logo)
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully set the logo")
+                        .setThumbnail(logo)
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("setcolor")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
                 String color = Objects.requireNonNull(event.getOption("color")).getAsString();
                 if(!ClanBot.isValidHexCode(color)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("Please use a valid hex color code")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("Please use a valid hex color code")
+                            .build()
                     ).queue();
                     return;
                 }
                 clan.setColor(color);
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully set the color")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully set the color")
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("setdiscord")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
                 String discord = Objects.requireNonNull(event.getOption("discord")).getAsString();
                 if(!ClanBot.isValidDiscordInvite(discord)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("Please use a valid discord")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("Please use a valid discord")
+                            .build()
                     ).queue();
                     return;
                 }
                 clan.setDiscord(discord);
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully set the discord")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully set the discord")
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("leave")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() == member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("Use **/clan disband** instead")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("Use **/clan disband** instead")
+                            .build()
                     ).queue();
                     return;
                 }
@@ -551,43 +654,48 @@ public class ClanCommands extends ListenerAdapter {
                 clan.removeMember(member);
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully left `" + clan.getName() + "`")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully left `" + clan.getName() + "`")
+                        .build()
                 ).queue();
             } else if(Objects.requireNonNull(event.getSubcommandName()).equalsIgnoreCase("setyoutube")) {
                 Clan clan = Clan.getByMember(member);
                 if(clan == null) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not in a clan")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not in a clan")
+                            .build()
                     ).queue();
                     return;
                 }
                 if(clan.getLeader() != member.getIdLong()) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("You are not the leader of `" + clan.getName() + "`")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("You are not the leader of `" + clan.getName() + "`")
+                            .build()
                     ).queue();
                     return;
                 }
                 String youtube = Objects.requireNonNull(event.getOption("youtube")).getAsString();
                 if(!ClanBot.isValidYoutube(youtube)) {
                     event.replyEmbeds(
-                            new EmbedBuilder()
-                                    .setDescription("Please use a valid youtube")
-                                    .build()
+                        new EmbedBuilder()
+                            .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                            .setDescription("Please use a valid youtube")
+                            .build()
                     ).queue();
                     return;
                 }
                 clan.setYoutube(youtube);
                 clan.save();
                 event.replyEmbeds(
-                        new EmbedBuilder()
-                                .setDescription("Successfully set the youtube")
-                                .build()
+                    new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
+                        .setDescription("Successfully set the youtube")
+                        .build()
                 ).queue();
             }
         }

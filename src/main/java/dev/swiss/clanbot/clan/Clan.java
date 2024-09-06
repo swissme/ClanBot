@@ -112,6 +112,7 @@ public class Clan {
         channelObject.sendMessage(roleObject.getAsMention()).queue();
         channelObject.sendMessageEmbeds(
                 new EmbedBuilder()
+                        .setColor(ClanBot.getInstance().getEmbedRGBColor().getColorFromRGB())
                         .setDescription("**Welcome to the " + ClanBot.getInstance().getConfig().getServerName() + " Clan System**\n" +
                                 "You can use the following commands:\n\n" +
                                 "> **/clan invite** <member> - Invites a user to your clan.\n" +

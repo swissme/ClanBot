@@ -43,6 +43,12 @@ public class ClanBot {
     private Category clanCategory;
 
     @Getter
+    private TextChannel adminLogChannel;
+
+    @Getter
+    private RGB embedRGBColor;
+
+    @Getter
     private Role leaderRole;
 
     @Getter
@@ -113,6 +119,12 @@ public class ClanBot {
             System.exit(0);
             return;
         }
+        adminLogChannel = guild.getTextChannelById(config.getAdminLogChannel());
+        if(adminLogChannel == null) {
+            System.out.println("Admin Log Channel is null");
+            System.exit(0);
+            return;
+        }
         leaderRole = guild.getRoleById(config.getLeaderRole());
         if(leaderRole == null) {
             System.out.println("Leader Role is null");
@@ -134,6 +146,13 @@ public class ClanBot {
         String prefix = config.getPrefix();
         if(prefix.isEmpty()) {
             System.out.println("Prefix is invalid");
+            System.exit(0);
+            return;
+        }
+        String embedColor = config.getEmbedColor();
+        embedRGBColor = RGB.fromHex(config.getEmbedColor());
+        if(embedColor == null) {
+            System.out.println("Embed Color is invalid");
             System.exit(0);
             return;
         }
@@ -211,17 +230,31 @@ public class ClanBot {
             )
             .queue();
 
+        guild.upsertCommand("wipelist", "Manages all of the wipe lists")
+                .addSubcommands(
+                        new SubcommandData("create", "Creates a wipe list")
+                                .addOption(OptionType.STRING, "timestamp", "Timestamp for when the wipe is", true)
+                )
+                .addSubcommands(
+                        new SubcommandData("delete", "Deletes a wipe list")
+                                .addOption(OptionType.STRING, "uuid", "UUID of the wipe list", true)
+                )
+                .queue();
+
         jda.addEventListener(new MessageCommandListener());
         jda.addEventListener(new ClanCommands());
         jda.addEventListener(new StaffCommands());
+        jda.addEventListener(new WipeListCommands());
         jda.addEventListener(new UserLeaveListener());
+        jda.addEventListener(new WipelistButtonListener());
         jda.addEventListener(new ButtonClickListener());
+        jda.addEventListener(new ClanRequestButtonListener());
     }
 
     public EmbedBuilder getHelpMessage() {
         return new EmbedBuilder()
                 .setTitle(config.getServerName() + " Rust Server's Clan Management Commands")
-                .setColor(new Color(47, 49, 54))
+                .setColor(this.embedRGBColor.getColorFromRGB())
                 .setDescription("Please revert to the slash commands, to get started use `/`. After that you can click on our discord bot then see what commands there are." +
                         "\n\nUse `/clan create <clan tag>` - To make your first clan!\n\n" +
                         "**Leader**\n" +
@@ -321,6 +354,43 @@ public class ClanBot {
                         .setDescription("You have invited " + member.getAsMention() + " to `" + clan.getName() + "`")
                         .build()
         );
+    }
+
+    @Data
+    public static class RGB {
+
+        private final int red;
+        private final int green;
+        private final int blue;
+
+        public RGB(int red, int green, int blue) {
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+        }
+
+        public Color getColorFromRGB() {
+            return new Color(this.red, this.blue, this.green);
+        }
+
+        public static RGB fromHex(String hex) {
+            if (hex.startsWith("#")) {
+                hex = hex.substring(1);
+            }
+
+            if (hex.length() == 3) {
+                hex = hex.substring(0, 1) + hex.substring(0, 1) +
+                        hex.substring(1, 2) + hex.substring(1, 2) +
+                        hex.substring(2, 3) + hex.substring(2, 3);
+            }
+
+            return new RGB(
+                    Integer.valueOf(hex.substring(0, 2), 16),
+                    Integer.valueOf(hex.substring(2, 4), 16),
+                    Integer.valueOf(hex.substring(4, 6), 16)
+            );
+        }
+
     }
 
 }

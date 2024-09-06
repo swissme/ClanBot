@@ -18,6 +18,12 @@ public class MongoHandler {
   @Getter
   private static MongoCollection<Document> clans;
 
+  @Getter
+  private static MongoCollection<Document> clanRequests;
+
+  @Getter
+  private static MongoCollection<Document> wipeListClans;
+
   public MongoHandler(MongoCredentials mongoCredentials) {
     if (mongoCredentials.isAuth()) client =
       new MongoClient(
@@ -45,7 +51,11 @@ public class MongoHandler {
       mongoClient.getDatabase(mongoCredentials.getDatabase());
 
     clans = mongoDatabase.getCollection("clans");
+    clanRequests = mongoDatabase.getCollection("clanRequests");
+    wipeListClans = mongoDatabase.getCollection("wipeListClans");
 
     Clan.loadClans();
+    ClanRequest.loadClanRequests();
+    Wipelist.loadWipelists();
   }
 }

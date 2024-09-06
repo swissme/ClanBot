@@ -5,13 +5,17 @@
 
   "clanCategory": "",
 
+  "adminLogChannel": "",
+
+  "embedColor": "#ff0000",
+
   "leaderRole": "",
   "coLeaderRole": "",
 
   "mongo_legacy": true,
-  "mongo_host": "mongodb uri if you use legacy, if not just put the ip",
+  "mongo_host": "",
   "mongo_port": 27017,
-  "mongo_database": "database name you want to store it as",
+  "mongo_database": "Clans",
   "mongo_auth": false,
   "mongo_username": "Username",
   "mongo_password": "Password",

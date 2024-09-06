@@ -1,0 +1,6 @@
+dev\swiss\clanbot\clan\ClanRequest.class
+dev\swiss\clanbot\clan\listeners\WipelistButtonListener.class
+dev\swiss\clanbot\clan\Wipelist.class
+dev\swiss\clanbot\ClanBot$RGB.class
+dev\swiss\clanbot\clan\commands\WipeListCommands.class
+dev\swiss\clanbot\clan\listeners\ClanRequestButtonListener.class
